@@ -71,10 +71,7 @@ namespace MbsCore.AddressableManagement.Runtime
 
             _loadedAssetMap.Remove(asset);
             _responsesMap.Remove(id);
-            if (!Addressables.ReleaseInstance(response.OperationHandle))
-            {
-                Object.Destroy(asset);
-            }
+            ReleaseResponse(ref response);
         }
         
         public void Dispose()
@@ -94,6 +91,18 @@ namespace MbsCore.AddressableManagement.Runtime
             
             _loadedAssetMap.Clear();
             _responsesMap.Clear();
+        }
+
+        private void ReleaseResponse<T>(ref AssetResponse<T> response) where T : Object
+        {
+            Object asset = response.OperationHandle.Result;
+            if (!Addressables.ReleaseInstance(response.OperationHandle))
+            {
+                Object.Destroy(asset);
+            }
+
+            response.HasHandler = false;
+            response = null;
         }
 
         private async Task LoadAssetAsync<TResult>(AssetResponse<TResult> response, CancellationToken token)
