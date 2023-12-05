@@ -1,0 +1,27 @@
+{
+    "name": "com.danilchizhikov.addressablemanagement",
+    "displayName": "Addressable Management",
+    "version": "0.0.1",
+    "unity": "2022.3",
+    "dependencies": {
+        "com.unity.addressables": "1.21.19"
+    },
+    "description": "Addressable Management package for Unity.",
+    "keywords": [
+        "Addressable Management",
+        "Addressable",
+        "Addressables"
+    ],
+    "category": "Tools",
+    "author": "MbsCore",
+    "repository": {
+        "type": "git",
+        "url": "ssh://github.com:DanilChizhikov/AddressableManagement.git",
+        "directory": "com.danilchizhikov.addressablemanagement"
+    },
+    "publishConfig": {
+        "registry": "https://npm.pkg.github.com/@DanilChizhikov"
+    },
+    "license": "MIT"
+  }
+  
