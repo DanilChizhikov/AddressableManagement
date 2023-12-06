@@ -10,6 +10,7 @@ This package shows a possible implementation of working with Addressables Unity.
     - [Install via UPM (using Git URL)](#Install-via-UPM-(using-Git-URL))
 - [Basic Usage](#Basic-Usage)
     - [Runtime Code](#Runtime-Code)
+    - [Remote Assets](#Remote-Assets)
 - [License](#License)
 
 ## Getting Started
@@ -26,7 +27,7 @@ Prerequisites:
 1. Navigate to your project's Packages folder and open the manifest.json file.
 2. Add this line below the "dependencies": { line
     - ```json title="Packages/manifest.json"
-      "com.danilchizhikov.addressablemanagement": "https://github.com/DanilChizhikov/AddressableManagement.git?path=Assets/AddressableManagement#0.0.1",
+      "com.danilchizhikov.addressablemanagement": "https://github.com/DanilChizhikov/AddressableManagement.git?path=Assets/AddressableManagement#0.0.2",
       ```
 UPM should now install the package.
 
@@ -122,6 +123,37 @@ namespace MbsCore.AddressableManagement.Infrastructure
     }
 }
 ```
+
+### Remote Assets
+
+To download assets remotely, you can use the following methods.
+```csharp
+namespace MbsCore.AddressableManagement.Infrastructure
+{
+    public interface IAssetService
+    {
+        //Returns the size of the bytes required for downloading.
+        Task<long> GetDownloadSizeAsync();
+        //Starts downloading assets and returns a user-friendly interface for tracking progress.
+        IAssetDownloadResponse DownloadAssets();
+    }
+}
+```
+
+IAssetDownloadResponse:
+```csharp
+namespace MbsCore.AddressableManagement.Infrastructure
+{
+    public interface IAssetDownloadResponse
+    {
+        float Progress { get; }
+        float DownloadMegabytes { get; }
+        float DownloadedMegabytes { get; }
+        bool IsDone { get; }
+    }
+}
+```
+
 ## License
 
 MIT

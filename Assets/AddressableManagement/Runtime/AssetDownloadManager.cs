@@ -114,7 +114,7 @@ namespace MbsCore.AddressableManagement.Runtime
 
             await handle.Task;
             Addressables.Release(handle);
-            _response.IsDone = Mathf.Approximately(_response.DownloadMegabytes, _response.DownloadedMegabytes);
+            _response.CheckDoneStatus();
         }
     }
 }
