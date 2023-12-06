@@ -18,14 +18,24 @@ namespace MbsCore.AddressableManagement.Runtime
         private readonly Dictionary<string, CancellationTokenSource> _loadAssetTokenMap;
         private readonly Dictionary<string, IAssetResponse> _responsesMap;
         private readonly Dictionary<Object, string> _loadedAssetMap;
+        private readonly AssetDownloadManager _downloadManager;
 
         public AssetService()
         {
             _loadAssetTokenMap = new Dictionary<string, CancellationTokenSource>();
             _responsesMap = new Dictionary<string, IAssetResponse>();
             _loadedAssetMap = new Dictionary<Object, string>();
+            _downloadManager = new AssetDownloadManager();
         }
-        
+
+        public async Task<long> GetDownloadSizeAsync()
+        {
+            await _downloadManager.InitializeAsync();
+            return _downloadManager.DownloadSize;
+        }
+
+        public IAssetDownloadResponse DownloadAssets() => _downloadManager.DownloadAssets();
+
         public IAssetResponse<TResult> LoadAsset<TResult>(AssetReference reference) where TResult : Object
         {
             if (!reference.RuntimeKeyIsValid())
