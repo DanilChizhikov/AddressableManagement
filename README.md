@@ -20,7 +20,7 @@ Prerequisites:
 - [Addressables](https://docs.unity3d.com/Manual/com.unity.addressables.html) 1.21.19+
 
 ### Install manually (using .unitypackage)
-1. Download the .unitypackage from [releases](https://github.com/DanilChizhikov/Localization/releases/) page.
+1. Download the .unitypackage from [releases](https://github.com/DanilChizhikov/AddressableManagement/releases/) page.
 2. Open AddressableManagement.x.x.x.unitypackage
 
 ### Install via UPM (using Git URL)
