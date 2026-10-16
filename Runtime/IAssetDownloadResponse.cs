@@ -1,4 +1,4 @@
-namespace MbsCore.AddressableManagement.Infrastructure
+namespace DTech.AddressableManagement
 {
     public interface IAssetDownloadResponse
     {

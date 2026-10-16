@@ -2,13 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using MbsCore.AddressableManagement.Infrastructure;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
 using UnityEngine.AddressableAssets.ResourceLocators;
 using UnityEngine.ResourceManagement.AsyncOperations;
 
-namespace MbsCore.AddressableManagement.Runtime
+namespace DTech.AddressableManagement
 {
     internal sealed class AssetDownloadManager : IDisposable
     {
@@ -16,12 +15,12 @@ namespace MbsCore.AddressableManagement.Runtime
         private const int DownloadDelay = 1000;
         
         private readonly List<object> _resourceKeys;
-
-        private AssetDownloadResponse _response;
-        private CancellationTokenSource _downloadTokenSource;
         
         public bool IsInitialized { get; private set; }
         public long DownloadSize { get; private set; }
+        
+        private AssetDownloadResponse _response;
+        private CancellationTokenSource _downloadTokenSource;
 
         public AssetDownloadManager()
         {

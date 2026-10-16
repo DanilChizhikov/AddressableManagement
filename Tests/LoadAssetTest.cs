@@ -1,6 +1,5 @@
 using System.Collections;
-using MbsCore.AddressableManagement.Infrastructure;
-using MbsCore.AddressableManagement.Runtime;
+using DTech.AddressableManagement;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
@@ -26,11 +25,11 @@ namespace MbsCore.AddressableManagement.Tests
         public IEnumerator LoadAssetWithKey()
         {
             var service = new AssetService();
-            IAssetResponse<GameObject> response = service.LoadAsset<GameObject>(AssetKey);
+            IAssetHandler<GameObject> handler = service.LoadAsset<GameObject>(AssetKey);
 
-            yield return new WaitUntil(() => response.IsDone);
+            yield return new WaitUntil(() => handler.IsDone);
 
-            bool hasResult = response.Result != null;
+            bool hasResult = handler.Result != null;
             service.Dispose();
             Assert.AreEqual(true, hasResult);
         }
@@ -39,11 +38,11 @@ namespace MbsCore.AddressableManagement.Tests
         public IEnumerator LoadAssetWithReference()
         {
             var service = new AssetService();
-            IAssetResponse<GameObject> response = service.LoadAsset<GameObject>(_reference);
+            IAssetHandler<GameObject> handler = service.LoadAsset<GameObject>(_reference);
 
-            yield return new WaitUntil(() => response.IsDone);
+            yield return new WaitUntil(() => handler.IsDone);
 
-            bool hasResult = response.Result != null;
+            bool hasResult = handler.Result != null;
             service.Dispose();
             Assert.AreEqual(true, hasResult);
         }

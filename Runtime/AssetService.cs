@@ -2,13 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using MbsCore.AddressableManagement.Infrastructure;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
 using UnityEngine.ResourceManagement.AsyncOperations;
 using Object = UnityEngine.Object;
 
-namespace MbsCore.AddressableManagement.Runtime
+namespace DTech.AddressableManagement
 {
     public sealed class AssetService : IAssetService, IDisposable
     {
@@ -16,16 +15,36 @@ namespace MbsCore.AddressableManagement.Runtime
         private const int MillisecondsDelay = 1000;
         
         private readonly Dictionary<string, CancellationTokenSource> _loadAssetTokenMap;
-        private readonly Dictionary<string, IAssetResponse> _responsesMap;
+        private readonly Dictionary<string, IAssetHandler> _responsesMap;
         private readonly Dictionary<Object, string> _loadedAssetMap;
         private readonly AssetDownloadManager _downloadManager;
 
         public AssetService()
         {
             _loadAssetTokenMap = new Dictionary<string, CancellationTokenSource>();
-            _responsesMap = new Dictionary<string, IAssetResponse>();
+            _responsesMap = new Dictionary<string, IAssetHandler>();
             _loadedAssetMap = new Dictionary<Object, string>();
             _downloadManager = new AssetDownloadManager();
+        }
+        
+        public async Task<long> GetDownloadSizeAsync(CancellationToken token = default)
+        {
+            
+        }
+
+        public IAssetDownloadResponse DownloadAssets(bool updateCatalogs, CancellationToken token = default)
+        {
+            
+        }
+
+        public IAssetHandler<TResult> LoadAsset<TResult>(AssetKey key)
+        {
+            
+        }
+
+        public void UnloadAsset(AssetKey key)
+        {
+            
         }
 
         public async Task<long> GetDownloadSizeAsync()
@@ -36,34 +55,34 @@ namespace MbsCore.AddressableManagement.Runtime
 
         public IAssetDownloadResponse DownloadAssets() => _downloadManager.DownloadAssets();
 
-        public IAssetResponse<TResult> LoadAsset<TResult>(AssetReference reference) where TResult : Object
+        public IAssetHandler<TResult> LoadAsset<TResult>(AssetReference reference) where TResult : Object
         {
             if (!reference.RuntimeKeyIsValid())
             {
                 throw new ArgumentException($"{nameof(AssetReference)} runtime kye is invalid!");
             }
 
-            if (_responsesMap.TryGetValue(reference.AssetGUID, out IAssetResponse cachedResponse))
+            if (_responsesMap.TryGetValue(reference.AssetGUID, out IAssetHandler cachedResponse))
             {
-                return cachedResponse as IAssetResponse<TResult>;
+                return cachedResponse as IAssetHandler<TResult>;
             }
 
             return LoadAsset<TResult>(reference.RuntimeKey.ToString());
         }
 
-        public IAssetResponse<TResult> LoadAsset<TResult>(string key) where TResult : Object
+        public IAssetHandler<TResult> LoadAsset<TResult>(string key) where TResult : Object
         {
-            if (_responsesMap.TryGetValue(key, out IAssetResponse cachedResponse))
+            if (_responsesMap.TryGetValue(key, out IAssetHandler cachedResponse))
             {
-                return cachedResponse as IAssetResponse<TResult>;
+                return cachedResponse as IAssetHandler<TResult>;
             }
             
-            AssetResponse<TResult> response = AssetUtility.LoadAssetAsync<TResult>(key);
+            AssetHandler<TResult> handler = AssetUtility.LoadAssetAsync<TResult>(key);
             var tokenSource = new CancellationTokenSource();
             _loadAssetTokenMap.Add(key, tokenSource);
-            Task.Factory.StartNew(() => LoadAssetAsync(response, tokenSource.Token));
-            _responsesMap.Add(key, response);
-            return response;
+            Task.Factory.StartNew(() => LoadAssetAsync(handler, tokenSource.Token));
+            _responsesMap.Add(key, handler);
+            return handler;
         }
 
         public void UnloadAsset<T>(T asset) where T : Object
@@ -73,8 +92,8 @@ namespace MbsCore.AddressableManagement.Runtime
                 return;
             }
             
-            if(!_responsesMap.TryGetValue(id, out IAssetResponse cachedResponse) ||
-               cachedResponse is not AssetResponse<T> response)
+            if(!_responsesMap.TryGetValue(id, out IAssetHandler cachedResponse) ||
+               cachedResponse is not AssetHandler<T> response)
             {
                 return;
             }
@@ -103,22 +122,22 @@ namespace MbsCore.AddressableManagement.Runtime
             _responsesMap.Clear();
         }
 
-        private void ReleaseResponse<T>(ref AssetResponse<T> response) where T : Object
+        private void ReleaseResponse<T>(ref AssetHandler<T> handler) where T : Object
         {
-            Object asset = response.OperationHandle.Result;
-            if (!Addressables.ReleaseInstance(response.OperationHandle))
+            Object asset = handler.OperationHandle.Result;
+            if (!Addressables.ReleaseInstance(handler.OperationHandle))
             {
                 Object.Destroy(asset);
             }
 
-            response.HasHandler = false;
-            response = null;
+            handler.HasHandler = false;
+            handler = null;
         }
 
-        private async Task LoadAssetAsync<TResult>(AssetResponse<TResult> response, CancellationToken token)
+        private async Task LoadAssetAsync<TResult>(AssetHandler<TResult> handler, CancellationToken token)
                 where TResult : Object
         {
-            AsyncOperationHandle<TResult> operationHandle = response.OperationHandle;
+            AsyncOperationHandle<TResult> operationHandle = handler.OperationHandle;
             while (!Mathf.Approximately(operationHandle.PercentComplete, MaxPercentComplete))
             {
                 await Task.Delay(MillisecondsDelay);
@@ -127,16 +146,16 @@ namespace MbsCore.AddressableManagement.Runtime
             await WaitUntil(() => operationHandle.IsDone);
             if (token.IsCancellationRequested)
             {
-                response.HasHandler = false;
+                handler.HasHandler = false;
                 Addressables.Release(operationHandle);
             }
             else
             {
-                _loadedAssetMap.Add(operationHandle.Result, response.Id);
+                _loadedAssetMap.Add(operationHandle.Result, handler.Key);
             }
 
-            CancellationTokenSource tokenSource = _loadAssetTokenMap[response.Id];
-            _loadAssetTokenMap.Remove(response.Id);
+            CancellationTokenSource tokenSource = _loadAssetTokenMap[handler.Key];
+            _loadAssetTokenMap.Remove(handler.Key);
             tokenSource.Dispose();
         }
 
