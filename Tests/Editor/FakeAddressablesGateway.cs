@@ -23,6 +23,12 @@ namespace DTech.AddressableManagement.Tests.Editor
 		public Func<ContentScope, ContentOperation<bool>> DownloadOperation { get; set; } =
 			_ => FakeContentOperation<bool>.Succeeded(true);
 		public IList<IResourceLocation> RemoteContent { get; set; } = new List<IResourceLocation>();
+		public Func<string, Type, IList<IResourceLocation>> Locate { get; set; } = LocateByKey;
+		public Func<IResourceLocation, object> LoadResult { get; set; } = _ => null;
+		public bool CompleteLoadsImmediately { get; set; } = true;
+		public List<IResourceLocation> LoadedLocations { get; } = new List<IResourceLocation>();
+		public List<IFakeOperation> LoadOperations { get; } = new List<IFakeOperation>();
+		public List<Type> LocatedTypes { get; } = new List<Type>();
 		public List<string> ProbedUrls { get; } = new List<string>();
 		public List<ContentScope> DownloadedScopes { get; } = new List<ContentScope>();
 		public List<string> UpdatedCatalogIds { get; } = new List<string>();
@@ -32,6 +38,7 @@ namespace DTech.AddressableManagement.Tests.Editor
 		public int VersionResetCalls { get; private set; }
 		public int DownloadSizeCalls { get; private set; }
 		public int RemoteContentCollections { get; private set; }
+		public int LocateCalls { get; private set; }
 
 		private bool _isInternetReachable = true;
 		private bool _isEditor;
@@ -117,6 +124,26 @@ namespace DTech.AddressableManagement.Tests.Editor
 			return RemoteContent;
 		}
 
+		public override Task<IList<IResourceLocation>> LocateAsync(string runtimeKey, Type type, CancellationToken token)
+		{
+			LocateCalls++;
+			LocatedTypes.Add(type);
+			return Task.FromResult(Locate(runtimeKey, type));
+		}
+
+		public override ContentOperation<TAsset> LoadAsset<TAsset>(IResourceLocation location)
+		{
+			LoadedLocations.Add(location);
+			var operation = new FakeContentOperation<TAsset>();
+			LoadOperations.Add(operation);
+			if (CompleteLoadsImmediately)
+			{
+				operation.Settle(LoadResult(location));
+			}
+
+			return operation;
+		}
+
 		public override async Task NextFrameAsync(CancellationToken token)
 		{
 			token.ThrowIfCancellationRequested();
@@ -127,6 +154,14 @@ namespace DTech.AddressableManagement.Tests.Editor
 		{
 			token.ThrowIfCancellationRequested();
 			await Task.Yield();
+		}
+		
+		private static IList<IResourceLocation> LocateByKey(string runtimeKey, Type type)
+		{
+			return new List<IResourceLocation>
+			{
+				new ResourceLocationBase(runtimeKey, "Assets/" + runtimeKey, "FakeProvider", type),
+			};
 		}
 
 		private sealed class Uninstaller : IDisposable

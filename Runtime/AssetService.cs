@@ -6,6 +6,7 @@ using DTech.AddressableManagement.Internal.Delivery;
 using DTech.AddressableManagement.Internal.Diagnostics;
 using DTech.AddressableManagement.Internal.Downloads;
 using DTech.AddressableManagement.Internal.Gateway;
+using DTech.AddressableManagement.Internal.Loading;
 using UnityEngine;
 
 namespace DTech.AddressableManagement
@@ -21,15 +22,17 @@ namespace DTech.AddressableManagement
         /// </summary>
         public event Action<ContentFailure> OnFailed;
 
-        private readonly CancellationTokenSource _lifetime = new CancellationTokenSource();
+        private readonly CancellationTokenSource _lifetime = new();
         private readonly AssetLog _log;
         private readonly ContentRoute _route;
         private readonly ContentContext _context;
         private readonly ContentBootstrapper _bootstrapper;
         private readonly CatalogUpdater _catalogs;
-        private readonly DownloadStateCache _downloadCache = new DownloadStateCache();
-        private readonly DownloadSuspension _downloadSuspension = new DownloadSuspension();
+        private readonly DownloadStateCache _downloadCache = new();
+        private readonly DownloadSuspension _downloadSuspension = new();
         private readonly DownloadCoordinator _downloads;
+        private readonly HandlerTracker _handlers = new();
+        private readonly AssetRegistry _assets;
 
         /// <summary>
         /// Whether Addressables finished initializing.
@@ -90,6 +93,8 @@ namespace DTech.AddressableManagement
             _catalogs = new CatalogUpdater(_context, _bootstrapper, settings.CleanBundleCacheAfterCatalogUpdate);
             _catalogs.OnCatalogsChanged += _downloadCache.Clear;
             _downloads = new DownloadCoordinator(_context, _bootstrapper, _catalogs, _downloadCache, _downloadSuspension);
+            var loadPolicy = new LoadPolicy(settings.LoadRetry, settings.RebindShadersInEditor);
+            _assets = new AssetRegistry(_context, _bootstrapper, _catalogs, loadPolicy);
         }
 
         /// <summary>
@@ -191,25 +196,75 @@ namespace DTech.AddressableManagement
         }
 
         /// <summary>
-        /// Loads an asset.
+        /// Loads an asset. Each call returns its own handler; one Addressables load serves every handler of the same
+        /// asset, and the asset is unloaded once all of them are released. A key that points at nothing gives a
+        /// failed handler.
         /// </summary>
         /// <param name="key">The asset key.</param>
         /// <param name="lifetime">Releases the handler when cancelled.</param>
         /// <returns>The handler of the load.</returns>
         public IAssetHandler<TAsset> LoadAsset<TAsset>(AssetKeyT<TAsset> key, CancellationToken lifetime = default)
-            where TAsset : UnityEngine.Object =>
-            throw new NotImplementedException();
+            where TAsset : UnityEngine.Object
+        {
+            ThrowIfDisposed();
+            if (key == null)
+            {
+                throw new ArgumentNullException(nameof(key));
+            }
+
+            var handler = new AssetHandler<TAsset>(key, _context, _handlers);
+            handler.AttachCancellationToken(lifetime);
+            if (handler.IsReleased)
+            {
+                return handler;
+            }
+
+            if (!key.IsValid)
+            {
+                var error = new ContentDeliveryException(FailureKind.InvalidKey, "The key does not point at any content.");
+                RaiseFailed(new ContentFailure(ContentStage.Load, FailureKind.InvalidKey, key.RuntimeKey, error));
+                handler.Fail(FailureKind.InvalidKey, error);
+                return handler;
+            }
+
+            _assets.Load(handler);
+            return handler;
+        }
 
         /// <summary>
-        /// Loads every asset of the label that loads as TAsset.
+        /// Loads every asset of the label that loads as TAsset. A label without such assets gives an empty list.
         /// </summary>
         /// <param name="key">The label key.</param>
         /// <param name="lifetime">Releases the handler when cancelled.</param>
-        /// <returns>The handler of the batch.</returns>
+        /// <returns>The handler of the batch; its result lists the loaded assets.</returns>
         public IAssetHandler<IReadOnlyList<TAsset>> LoadAssets<TAsset>(LabelKey key,
             CancellationToken lifetime = default)
-            where TAsset : UnityEngine.Object =>
-            throw new NotImplementedException();
+            where TAsset : UnityEngine.Object
+        {
+            ThrowIfDisposed();
+            if (key == null)
+            {
+                throw new ArgumentNullException(nameof(key));
+            }
+
+            var handler = new AssetBatchHandler<TAsset>(key, _context, _handlers);
+            handler.AttachCancellationToken(lifetime);
+            if (handler.IsReleased)
+            {
+                return handler;
+            }
+
+            if (!key.IsValid)
+            {
+                var error = new ContentDeliveryException(FailureKind.InvalidKey, "The label is empty.");
+                RaiseFailed(new ContentFailure(ContentStage.Load, FailureKind.InvalidKey, key.RuntimeKey, error));
+                handler.Fail(error);
+                return handler;
+            }
+
+            handler.Start(_assets);
+            return handler;
+        }
 
         /// <summary>
         /// Loads an addressable scene.
@@ -222,10 +277,20 @@ namespace DTech.AddressableManagement
             throw new NotImplementedException();
 
         /// <summary>
-        /// Releases every handler loaded with the key and unloads the content.
+        /// Releases every handler loaded with the key, whatever its type, and unloads the content.
+        /// Loads still resolving when this is called are not affected.
         /// </summary>
         /// <param name="key">The key to unload.</param>
-        public void UnloadAsset(AssetKey key) => throw new NotImplementedException();
+        public void UnloadAsset(AssetKey key)
+        {
+            ThrowIfDisposed();
+            if (key == null)
+            {
+                throw new ArgumentNullException(nameof(key));
+            }
+
+            _handlers.ReleaseAll(key.RuntimeKey);
+        }
 
         /// <summary>
         /// Cancels running work, releases everything the service holds and stops rewriting Addressables requests.
@@ -239,6 +304,8 @@ namespace DTech.AddressableManagement
 
             _isDisposed = true;
             _lifetime.Cancel();
+            _handlers.ReleaseLeaked(_log);
+            _assets.Dispose();
             _bootstrapper.Dispose();
             OnFailed = null;
         }
