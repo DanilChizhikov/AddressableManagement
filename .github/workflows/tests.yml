@@ -1,0 +1,142 @@
+name: Unity Tests
+
+# `detect` lists the test modes (editmode, playmode) the package has tests for, and `test` runs one job per mode from
+# that list. A mode without tests is left out instead of failing, and with no tests at all `test` is skipped.
+on:
+  push:
+    branches:
+      - master
+      - develop
+  pull_request:
+    branches:
+      - master
+      - develop
+
+permissions:
+  checks: write
+  contents: read
+
+jobs:
+  detect:
+    name: Detect Test Modes
+    runs-on: ubuntu-latest
+    outputs:
+      modes: ${{ steps.detect.outputs.modes }}
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Find test modes with tests
+        id: detect
+        run: python3 -I .github/scripts/detect-test-modes.py .
+
+  test:
+    name: Test ${{ matrix.testMode }}
+    needs: detect
+    if: needs.detect.outputs.modes != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        projectPath:
+          - empty-unity-project
+        testMode: ${{ fromJSON(needs.detect.outputs.modes) }}
+
+    steps:
+      - name: Free Disk Space (GitHub Actions)
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: false
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Clone empty Unity project
+        run: |
+          git clone https://DanilChizhikov:${{ secrets.PRIVATE_REPO_TOKEN }}@github.com/DanilChizhikov/empty-unity-project.git empty-unity-project
+
+      - name: Copy source into Unity project
+        run: |
+          mkdir -p ${{ matrix.projectPath }}/Assets/sources
+
+          shopt -s dotglob
+
+          for item in *; do
+            case "$item" in
+              ${{ matrix.projectPath }}|.git|.github|.gitignore|.gitattributes)
+                echo "Skipping $item"
+                ;;
+              *)
+                cp -R "$item" ${{ matrix.projectPath }}/Assets/sources/
+                ;;
+            esac
+          done
+
+      - name: Add package dependencies to project manifest
+        shell: bash
+        env:
+          PROJECT_PATH: ${{ matrix.projectPath }}
+        run: |
+          python3 - <<'PY'
+          import json, os, pathlib
+
+          package = json.loads(pathlib.Path("package.json").read_text(encoding="utf-8"))
+          manifest_path = pathlib.Path(os.environ["PROJECT_PATH"]) / "Packages" / "manifest.json"
+          manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+          dependencies = manifest.setdefault("dependencies", {})
+          for name, version in package.get("dependencies", {}).items():
+              dependencies.setdefault(name, version)
+
+          manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+          print(json.dumps(dependencies, indent=2))
+          PY
+
+      - name: Run Unity Tests
+        id: tests
+        uses: game-ci/unity-test-runner@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          unityVersion: 6000.0.63f1
+          projectPath: ${{ matrix.projectPath }}
+          testMode: ${{ matrix.testMode }}
+          artifactsPath: artifacts/${{ matrix.testMode }}
+          githubToken: ${{ secrets.GITHUB_TOKEN }}
+          checkName: ${{ matrix.testMode }} test results
+          customParameters: -buildTarget StandaloneLinux64
+
+      # The mode is in the matrix only because it has tests, so 0 tests here means its assembly did not compile in.
+      - name: Assert tests actually ran
+        if: always()
+        shell: bash
+        env:
+          TEST_MODE: ${{ matrix.testMode }}
+        run: |
+          file=$(find "artifacts/$TEST_MODE" -name '*-results.xml' 2>/dev/null | head -n 1)
+          if [ -z "$file" ]; then
+            echo "::error::No $TEST_MODE test results XML produced"
+            exit 1
+          fi
+          total=$(grep -o 'total="[0-9]*"' "$file" | head -n 1 | grep -o '[0-9]*')
+          echo "results=$file total=${total:-0}"
+          if [ "${total:-0}" -lt 1 ]; then
+            echo "::error::0 $TEST_MODE tests ran -> a gate excluded the test assembly"
+            exit 1
+          fi
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.testMode }}
+          path: artifacts/${{ matrix.testMode }}
+          if-no-files-found: ignore
