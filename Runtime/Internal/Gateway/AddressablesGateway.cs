@@ -12,6 +12,7 @@ using UnityEngine.AddressableAssets.ResourceLocators;
 using UnityEngine.Networking;
 using UnityEngine.ResourceManagement.AsyncOperations;
 using UnityEngine.ResourceManagement.ResourceLocations;
+using Object = UnityEngine.Object;
 
 namespace DTech.AddressableManagement.Internal.Gateway
 {
@@ -104,16 +105,33 @@ namespace DTech.AddressableManagement.Internal.Gateway
             var locations = new List<IResourceLocation>();
             foreach (IResourceLocator locator in Addressables.ResourceLocators)
             {
-                foreach (IResourceLocation location in locator.AllLocations)
+#if ENABLE_JSON_CATALOG
+                foreach (object key in locator.Keys)
                 {
-                    if (location.HasDependencies && seen.Add(location))
+                    if (locator.Locate(key, null, out IList<IResourceLocation> found))
                     {
-                        locations.Add(location);
+                        Collect(found, seen, locations);
                     }
                 }
+#else
+                Collect(locator.AllLocations, seen, locations);
+#endif
             }
 
             return locations;
+        }
+        
+        public override async Task<IList<IResourceLocation>> LocateAsync(string runtimeKey, Type type, CancellationToken token)
+        {
+            AsyncOperationHandle<IList<IResourceLocation>> handle = Addressables.LoadResourceLocationsAsync(runtimeKey, type);
+            IList<IResourceLocation> locations = await AwaitOwnedAsync(handle, token);
+            return locations == null ? new List<IResourceLocation>() : new List<IResourceLocation>(locations);
+        }
+
+        public override ContentOperation<TAsset> LoadAsset<TAsset>(IResourceLocation location)
+        {
+            AsyncOperationHandle<TAsset> handle = Addressables.LoadAssetAsync<TAsset>(location);
+            return new AddressablesOperation<TAsset>(handle);
         }
 
         public override async Task NextFrameAsync(CancellationToken token)
@@ -124,6 +142,17 @@ namespace DTech.AddressableManagement.Internal.Gateway
         public override Task DelayAsync(TimeSpan delay, CancellationToken token)
         {
             return delay > TimeSpan.Zero ? Task.Delay(delay, token) : NextFrameAsync(token);
+        }
+        
+        private static void Collect(IEnumerable<IResourceLocation> candidates, HashSet<IResourceLocation> seen, List<IResourceLocation> locations)
+        {
+            foreach (IResourceLocation location in candidates)
+            {
+                if (location.HasDependencies && seen.Add(location))
+                {
+                    locations.Add(location);
+                }
+            }
         }
         
         private static bool Succeeded(AsyncOperationHandle handle)

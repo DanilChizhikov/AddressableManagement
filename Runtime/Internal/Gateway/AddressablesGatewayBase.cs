@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using DTech.AddressableManagement.Internal.Downloads;
 using UnityEngine.ResourceManagement.ResourceLocations;
+using Object = UnityEngine.Object;
 
 namespace DTech.AddressableManagement.Internal.Gateway
 {
@@ -23,6 +24,8 @@ namespace DTech.AddressableManagement.Internal.Gateway
 		public abstract Task<long> GetDownloadSizeAsync(ContentScope scope, CancellationToken token);
 		public abstract ContentOperation<bool> Download(ContentScope scope);
 		public abstract IList<IResourceLocation> CollectRemoteContentLocations();
+		public abstract Task<IList<IResourceLocation>> LocateAsync(string runtimeKey, Type type, CancellationToken token);
+		public abstract ContentOperation<TAsset> LoadAsset<TAsset>(IResourceLocation location) where TAsset : Object;
 		public abstract Task NextFrameAsync(CancellationToken token);
 		public abstract Task DelayAsync(TimeSpan delay, CancellationToken token);
 	}
