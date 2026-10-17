@@ -1,0 +1,113 @@
+using System;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
+using DTech.AddressableManagement.Internal.Gateway;
+
+namespace DTech.AddressableManagement.Tests.Editor
+{
+	internal sealed class FakeAddressablesGateway : AddressablesGatewayBase
+	{
+		public override bool IsInternetReachable => _isInternetReachable;
+		public override bool IsEditor => _isEditor;
+		public bool VersionChanged { get; set; }
+		public Task InitializeBarrier { get; set; } = Task.CompletedTask;
+		public Func<int, Exception> InitializeFailure { get; set; } = _ => null;
+		public Func<string, bool> ProbeResult { get; set; } = _ => true;
+		public Task CatalogCheckBarrier { get; set; } = Task.CompletedTask;
+		public Func<int, IReadOnlyList<string>> CatalogCheck { get; set; } = _ => Array.Empty<string>();
+		public Func<string, string> InstalledRewriter { get; private set; }
+		public List<string> ProbedUrls { get; } = new List<string>();
+		public List<string> UpdatedCatalogIds { get; } = new List<string>();
+		public int InitializeCalls { get; private set; }
+		public int CatalogCheckCalls { get; private set; }
+		public int CleanBundleCacheCalls { get; private set; }
+		public int VersionResetCalls { get; private set; }
+
+		private bool _isInternetReachable = true;
+		private bool _isEditor;
+
+		public void SetIsInternetReachable(bool isInternetReachable) => _isInternetReachable = isInternetReachable;
+		public void SetIsEditor(bool isEditor) => _isEditor = isEditor;
+        
+		public override async Task InitializeAsync(CancellationToken token)
+		{
+			int call = InitializeCalls++;
+			await InitializeBarrier;
+			Exception failure = InitializeFailure(call);
+			if (failure != null)
+			{
+				throw failure;
+			}
+		}
+
+		public override Task WaitForCacheReadyAsync(CancellationToken token)
+		{
+			return Task.CompletedTask;
+		}
+
+		public override bool ResetCatalogCacheIfVersionChanged()
+		{
+			VersionResetCalls++;
+			return VersionChanged;
+		}
+
+		public override IDisposable InstallRequestRewriter(Func<string, string> rewrite)
+		{
+			InstalledRewriter = rewrite;
+			return new Uninstaller(this);
+		}
+
+		public override Task<bool> ProbeAsync(string url, TimeSpan timeout, CancellationToken token)
+		{
+			ProbedUrls.Add(url);
+			return Task.FromResult(ProbeResult(url));
+		}
+
+		public override async Task<IReadOnlyList<string>> CheckForCatalogUpdatesAsync(CancellationToken token)
+		{
+			int call = CatalogCheckCalls++;
+			await CatalogCheckBarrier;
+			return CatalogCheck(call);
+		}
+
+		public override Task UpdateCatalogsAsync(IReadOnlyList<string> catalogIds, CancellationToken token)
+		{
+			UpdatedCatalogIds.AddRange(catalogIds);
+			return Task.CompletedTask;
+		}
+
+		public override Task CleanBundleCacheAsync(CancellationToken token)
+		{
+			CleanBundleCacheCalls++;
+			return Task.CompletedTask;
+		}
+
+		public override async Task NextFrameAsync(CancellationToken token)
+		{
+			token.ThrowIfCancellationRequested();
+			await Task.Yield();
+		}
+
+		public override async Task DelayAsync(TimeSpan delay, CancellationToken token)
+		{
+			token.ThrowIfCancellationRequested();
+			await Task.Yield();
+		}
+
+		private sealed class Uninstaller : IDisposable
+		{
+			private readonly FakeAddressablesGateway _gateway;
+
+			public Uninstaller(FakeAddressablesGateway gateway)
+			{
+				_gateway = gateway;
+			}
+
+			public void Dispose()
+			{
+				_gateway.InstalledRewriter = null;
+			}
+		}
+	}
+}
