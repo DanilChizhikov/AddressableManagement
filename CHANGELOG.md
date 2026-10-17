@@ -17,7 +17,7 @@ A rebuild of the package around one `IAssetService` without a singleton, data-on
 - Single-flight `InitializeAsync` and `UpdateCatalogsAsync`; every operation waits for initialization and running catalog updates.
 - `OnFailed` with `ContentFailure` (stage, kind, key, exception); failures are classified from the web request result, not from exception text.
 - Optional reset of cached remote catalogs after an application version change and optional bundle cache cleanup after catalog updates.
-- Editor: CDN roots from Addressables profiles, key drawer, Analyze rule and menu item for local assets depending on remote ones, shader rebinding for bundles in the Editor.
+- Editor: CDN roots from Addressables profiles, key drawer, Analyze rule and menu item for local assets depending on remote ones, shader rebinding for bundles in the Editor, update window with release notes.
 - Leak report on `Dispose` and creation and release call sites for released handlers in the Editor and development builds.
 
 ### Fixed

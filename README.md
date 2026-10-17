@@ -225,6 +225,10 @@ also logged once as an error. Moves along the CDN route are logged as warnings a
   load offline.
 - With `RebindShadersInEditor` on, materials loaded from bundles in the Editor get the Editor's own shaders, so content
   built for a mobile target does not render pink in Use Existing Build mode. Project assets are never touched.
+- **Update window**: for a package installed from git or a registry, the Editor checks for a newer version once per
+  session and shows the release notes of every version after the installed one. **Skip Version** hides the window until
+  a newer release, **Skip Always** hides it for good, **Tools → DTech → Addressable Management → Check Update** opens it
+  on demand.
 
 ## Settings Reference
 | Setting | Default | Meaning |
