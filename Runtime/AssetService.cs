@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using DTech.AddressableManagement.Internal.Delivery;
 using DTech.AddressableManagement.Internal.Diagnostics;
+using DTech.AddressableManagement.Internal.Downloads;
 using DTech.AddressableManagement.Internal.Gateway;
 using UnityEngine;
 
@@ -26,6 +27,9 @@ namespace DTech.AddressableManagement
         private readonly ContentContext _context;
         private readonly ContentBootstrapper _bootstrapper;
         private readonly CatalogUpdater _catalogs;
+        private readonly DownloadStateCache _downloadCache = new DownloadStateCache();
+        private readonly DownloadSuspension _downloadSuspension = new DownloadSuspension();
+        private readonly DownloadCoordinator _downloads;
 
         /// <summary>
         /// Whether Addressables finished initializing.
@@ -45,7 +49,7 @@ namespace DTech.AddressableManagement
         /// <summary>
         /// Whether at least one download suspension is active.
         /// </summary>
-        public bool IsDownloadSuspended => false;
+        public bool IsDownloadSuspended => _downloadSuspension.IsSuspended;
 
         /// <summary>
         /// Logs routine progress. Warnings and errors are always logged.
@@ -80,12 +84,12 @@ namespace DTech.AddressableManagement
 
             _route = new ContentRoute(settings.Delivery, _log);
             gateway ??= new AddressablesGateway(_log);
-            _context = new ContentContext(gateway, _route, _log,
-                RaiseFailed,
-                _lifetime.Token);
+            _context = new ContentContext(gateway, _route, _log, RaiseFailed, _lifetime.Token);
 
             _bootstrapper = new ContentBootstrapper(_context, settings.ResetCatalogCacheOnVersionChange);
             _catalogs = new CatalogUpdater(_context, _bootstrapper, settings.CleanBundleCacheAfterCatalogUpdate);
+            _catalogs.OnCatalogsChanged += _downloadCache.Clear;
+            _downloads = new DownloadCoordinator(_context, _bootstrapper, _catalogs, _downloadCache, _downloadSuspension);
         }
 
         /// <summary>
@@ -117,24 +121,37 @@ namespace DTech.AddressableManagement
         /// </summary>
         /// <param name="key">Any asset, label or scene key.</param>
         /// <param name="token">Cancels the query.</param>
-        /// <returns>The number of bytes.</returns>
-        public Task<long> GetDownloadSizeAsync(AssetKey key, CancellationToken token = default) => throw new NotImplementedException();
+        /// <returns>The number of bytes; 0 when everything is cached or local.</returns>
+        public Task<long> GetDownloadSizeAsync(AssetKey key, CancellationToken token = default)
+        {
+            ThrowIfDisposed();
+            DownloadTarget downloadTarget = DownloadTarget.ForKeys(new[] { RequireValid(key, nameof(key)).RuntimeKey });
+            return _downloads.GetSizeAsync(downloadTarget, token);
+        }
 
         /// <summary>
-        /// Measures how many bytes the bundles behind the keys still need to download.
+        /// Measures how many bytes the bundles behind the keys still need to download. Shared bundles count once.
         /// </summary>
         /// <param name="keys">Any asset, label or scene keys.</param>
         /// <param name="token">Cancels the query.</param>
-        /// <returns>The number of bytes.</returns>
-        public Task<long> GetDownloadSizeAsync(IReadOnlyList<AssetKey> keys, CancellationToken token = default) =>
-            throw new NotImplementedException();
+        /// <returns>The number of bytes; 0 when everything is cached or local.</returns>
+        public Task<long> GetDownloadSizeAsync(IReadOnlyList<AssetKey> keys, CancellationToken token = default)
+        {
+            ThrowIfDisposed();
+            var downloadTarget = DownloadTarget.ForKeys(RuntimeKeys(keys));
+            return _downloads.GetSizeAsync(downloadTarget, token);
+        }
 
         /// <summary>
         /// Measures how many bytes all content of the loaded catalogs still needs to download.
         /// </summary>
         /// <param name="token">Cancels the query.</param>
-        /// <returns>The number of bytes.</returns>
-        public Task<long> GetRemoteContentSizeAsync(CancellationToken token = default) => throw new NotImplementedException();
+        /// <returns>The number of bytes; 0 when everything is cached or local.</returns>
+        public Task<long> GetRemoteContentSizeAsync(CancellationToken token = default)
+        {
+            ThrowIfDisposed();
+            return _downloads.GetSizeAsync(DownloadTarget.RemoteContent, token);
+        }
 
         /// <summary>
         /// Downloads the bundles behind the keys without loading them.
@@ -143,9 +160,12 @@ namespace DTech.AddressableManagement
         /// <param name="options">Retries and whether catalogs are updated first.</param>
         /// <param name="token">Cancels the download.</param>
         /// <returns>The running download.</returns>
-        public IAssetDownloadResponse DownloadAssets(IReadOnlyList<AssetKey> keys, DownloadOptions options,
-            CancellationToken token = default) =>
-            throw new NotImplementedException();
+        public IAssetDownloadResponse DownloadAssets(IReadOnlyList<AssetKey> keys, DownloadOptions options, CancellationToken token = default)
+        {
+            ThrowIfDisposed();
+            var downloadTarget = DownloadTarget.ForKeys(RuntimeKeys(keys));
+            return _downloads.Start(downloadTarget, options, token);
+        }
 
         /// <summary>
         /// Downloads the bundles of all content of the loaded catalogs without loading them.
@@ -153,15 +173,22 @@ namespace DTech.AddressableManagement
         /// <param name="options">Retries and whether catalogs are updated first.</param>
         /// <param name="token">Cancels the download.</param>
         /// <returns>The running download.</returns>
-        public IAssetDownloadResponse DownloadRemoteContent(DownloadOptions options,
-            CancellationToken token = default) =>
-            throw new NotImplementedException();
+        public IAssetDownloadResponse DownloadRemoteContent(DownloadOptions options, CancellationToken token = default)
+        {
+            ThrowIfDisposed();
+            return _downloads.Start(DownloadTarget.RemoteContent, options, token);
+        }
 
         /// <summary>
         /// Holds back downloads that have not started an attempt yet until the returned scope is disposed.
+        /// Running attempts and loads are not affected.
         /// </summary>
-        /// <returns>The suspension scope.</returns>
-        public IDisposable SuspendDownloads() => throw new NotImplementedException();
+        /// <returns>The suspension scope; dispose it to resume.</returns>
+        public IDisposable SuspendDownloads()
+        {
+            ThrowIfDisposed();
+            return _downloadSuspension.Suspend();
+        }
 
         /// <summary>
         /// Loads an asset.
@@ -214,6 +241,37 @@ namespace DTech.AddressableManagement
             _lifetime.Cancel();
             _bootstrapper.Dispose();
             OnFailed = null;
+        }
+        
+        private static TKey RequireValid<TKey>(TKey key, string parameterName) where TKey : AssetKey
+        {
+            if (key == null)
+            {
+                throw new ArgumentNullException(parameterName);
+            }
+
+            if (!key.IsValid)
+            {
+                throw new ArgumentException($"The key '{key}' does not point at any content.", parameterName);
+            }
+
+            return key;
+        }
+
+        private static string[] RuntimeKeys(IReadOnlyList<AssetKey> keys)
+        {
+            if (keys == null)
+            {
+                throw new ArgumentNullException(nameof(keys));
+            }
+
+            var runtimeKeys = new string[keys.Count];
+            for (int i = 0; i < keys.Count; i++)
+            {
+                runtimeKeys[i] = RequireValid(keys[i], nameof(keys)).RuntimeKey;
+            }
+
+            return runtimeKeys;
         }
 
         private void ThrowIfDisposed()
