@@ -1,7 +1,6 @@
-using MbsCore.AddressableManagement.Infrastructure;
 using UnityEngine;
 
-namespace MbsCore.AddressableManagement.Runtime
+namespace DTech.AddressableManagement
 {
     internal sealed class AssetDownloadResponse : IAssetDownloadResponse
     {

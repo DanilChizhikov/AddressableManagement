@@ -1,5 +1,5 @@
 {
-    "name": "com.danilchizhikov.addressablemanagement",
+    "name": "com.dtech.addressablemanagement",
     "displayName": "Addressable Management",
     "version": "0.0.2",
     "unity": "2022.3",
@@ -13,11 +13,11 @@
         "Addressables"
     ],
     "category": "Tools",
-    "author": "MbsCore",
+    "author": "DTech",
     "repository": {
         "type": "git",
         "url": "ssh://github.com:DanilChizhikov/AddressableManagement.git",
-        "directory": "com.danilchizhikov.addressablemanagement"
+        "directory": "com.dtech.addressablemanagement"
     },
     "publishConfig": {
         "registry": "https://npm.pkg.github.com/@DanilChizhikov"

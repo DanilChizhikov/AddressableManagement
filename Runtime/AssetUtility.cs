@@ -1,15 +1,15 @@
-using UnityEngine;
+using System;
 using UnityEngine.AddressableAssets;
 using UnityEngine.ResourceManagement.AsyncOperations;
+using Object = UnityEngine.Object;
 
-namespace MbsCore.AddressableManagement.Runtime
+namespace DTech.AddressableManagement
 {
     internal sealed class AssetUtility
     {
-        public static AssetResponse<TResult> LoadAssetAsync<TResult>(string key) where TResult : Object
+        public static AssetHandler<TResult> LoadAssetAsync<TResult>(string key) where TResult : Object
         {
-            AsyncOperationHandle<TResult> handle = Addressables.LoadAssetAsync<TResult>(key);
-            return new AssetResponse<TResult>(key, handle);
+            throw new NotImplementedException();
         }
     }
 }
