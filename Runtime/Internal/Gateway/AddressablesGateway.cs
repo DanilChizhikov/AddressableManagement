@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using DTech.AddressableManagement.Internal.Diagnostics;
 using DTech.AddressableManagement.Internal.Downloads;
+using DTech.AddressableManagement.Internal.Scenes;
 using DTech.AddressableManagement.Internal.Threading;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
@@ -12,6 +13,7 @@ using UnityEngine.AddressableAssets.ResourceLocators;
 using UnityEngine.Networking;
 using UnityEngine.ResourceManagement.AsyncOperations;
 using UnityEngine.ResourceManagement.ResourceLocations;
+using UnityEngine.ResourceManagement.ResourceProviders;
 using Object = UnityEngine.Object;
 
 namespace DTech.AddressableManagement.Internal.Gateway
@@ -132,6 +134,14 @@ namespace DTech.AddressableManagement.Internal.Gateway
         {
             AsyncOperationHandle<TAsset> handle = Addressables.LoadAssetAsync<TAsset>(location);
             return new AddressablesOperation<TAsset>(handle);
+        }
+
+        public override SceneOperation LoadScene(string runtimeKey, SceneLoadOptions options)
+        {
+            bool activateOnLoad = !options.DeferActivation;
+            AsyncOperationHandle<SceneInstance> handle =
+                Addressables.LoadSceneAsync(runtimeKey, options.Mode, activateOnLoad, options.Priority);
+            return new AddressablesSceneOperation(handle, activateOnLoad);
         }
 
         public override async Task NextFrameAsync(CancellationToken token)

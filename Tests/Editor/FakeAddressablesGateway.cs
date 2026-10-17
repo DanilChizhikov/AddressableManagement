@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using DTech.AddressableManagement.Internal.Downloads;
 using DTech.AddressableManagement.Internal.Gateway;
+using DTech.AddressableManagement.Internal.Scenes;
 using UnityEngine.ResourceManagement.ResourceLocations;
 
 namespace DTech.AddressableManagement.Tests.Editor
@@ -29,6 +30,9 @@ namespace DTech.AddressableManagement.Tests.Editor
 		public List<IResourceLocation> LoadedLocations { get; } = new List<IResourceLocation>();
 		public List<IFakeOperation> LoadOperations { get; } = new List<IFakeOperation>();
 		public List<Type> LocatedTypes { get; } = new List<Type>();
+		public Func<int, Exception> SceneFailure { get; set; } = _ => null;
+		public List<FakeSceneOperation> SceneOperations { get; } = new List<FakeSceneOperation>();
+		public List<SceneLoadOptions> SceneOptions { get; } = new List<SceneLoadOptions>();
 		public List<string> ProbedUrls { get; } = new List<string>();
 		public List<ContentScope> DownloadedScopes { get; } = new List<ContentScope>();
 		public List<string> UpdatedCatalogIds { get; } = new List<string>();
@@ -139,6 +143,24 @@ namespace DTech.AddressableManagement.Tests.Editor
 			if (CompleteLoadsImmediately)
 			{
 				operation.Settle(LoadResult(location));
+			}
+
+			return operation;
+		}
+		
+		public override SceneOperation LoadScene(string runtimeKey, SceneLoadOptions options)
+		{
+			var operation = new FakeSceneOperation(!options.DeferActivation);
+			Exception failure = SceneFailure(SceneOperations.Count);
+			SceneOperations.Add(operation);
+			SceneOptions.Add(options);
+			if (failure != null)
+			{
+				operation.Fail(failure);
+			}
+			else
+			{
+				operation.Succeed();
 			}
 
 			return operation;
