@@ -136,6 +136,7 @@ namespace DTech.AddressableManagement.Internal.Scenes
                 return;
             }
 
+            _tracker.Untrack(this);
             IsDone = true;
             IsFailed = true;
             Exception = exception;

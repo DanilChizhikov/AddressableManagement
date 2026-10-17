@@ -59,7 +59,8 @@ namespace DTech.AddressableManagement
         Task<CatalogState> UpdateCatalogsAsync(CancellationToken token = default);
 
         /// <summary>
-        /// Measures how many bytes the bundles behind the key still need to download.
+		/// Measures how many bytes the bundles behind the key still need to download. Throws ArgumentException for a
+		/// key that points at nothing.
         /// </summary>
         /// <param name="key">Any asset, label or scene key.</param>
         /// <param name="token">Cancels the query.</param>
@@ -76,13 +77,15 @@ namespace DTech.AddressableManagement
 
         /// <summary>
         /// Measures how many bytes all content of the loaded catalogs still needs to download.
+		/// Throws ArgumentException for a key that points at nothing.
         /// </summary>
         /// <param name="token">Cancels the query.</param>
         /// <returns>The number of bytes; 0 when everything is cached or local.</returns>
         Task<long> GetRemoteContentSizeAsync(CancellationToken token = default);
 
         /// <summary>
-        /// Downloads the bundles behind the keys without loading them.
+		/// Downloads the bundles behind the keys without loading them. Throws ArgumentException for a key that points
+		/// at nothing.
         /// </summary>
         /// <param name="keys">Any asset, label or scene keys.</param>
         /// <param name="options">Retries and whether catalogs are updated first.</param>
@@ -108,7 +111,8 @@ namespace DTech.AddressableManagement
 
         /// <summary>
         /// Loads an asset. Each call returns its own handler; one Addressables load serves every handler of the same
-        /// asset, and the asset is unloaded once all of them are released.
+		/// asset, and the asset is unloaded once all of them are released. A key that points at nothing gives a failed
+		/// handler.
         /// </summary>
         /// <param name="key">The asset key.</param>
         /// <param name="lifetime">Releases the handler when cancelled.</param>
@@ -117,7 +121,8 @@ namespace DTech.AddressableManagement
                 where TAsset : UnityEngine.Object;
 
         /// <summary>
-        /// Loads every asset of the label that loads as TAsset.
+		/// Loads every asset of the label that loads as TAsset. A label without such assets gives an empty list; an
+		/// empty label gives a failed handler.
         /// </summary>
         /// <param name="key">The label key.</param>
         /// <param name="lifetime">Releases the handler when cancelled.</param>
@@ -126,7 +131,7 @@ namespace DTech.AddressableManagement
                 where TAsset : UnityEngine.Object;
 
         /// <summary>
-        /// Loads an addressable scene.
+        /// Loads an addressable scene. A key that points at nothing gives a failed handler.
         /// </summary>
         /// <param name="key">The scene key.</param>
         /// <param name="options">Load mode, deferred activation and priority.</param>
