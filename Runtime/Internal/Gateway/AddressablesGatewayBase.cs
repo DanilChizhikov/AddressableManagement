@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using DTech.AddressableManagement.Internal.Downloads;
+using DTech.AddressableManagement.Internal.Scenes;
 using UnityEngine.ResourceManagement.ResourceLocations;
 using Object = UnityEngine.Object;
 
@@ -26,6 +27,7 @@ namespace DTech.AddressableManagement.Internal.Gateway
 		public abstract IList<IResourceLocation> CollectRemoteContentLocations();
 		public abstract Task<IList<IResourceLocation>> LocateAsync(string runtimeKey, Type type, CancellationToken token);
 		public abstract ContentOperation<TAsset> LoadAsset<TAsset>(IResourceLocation location) where TAsset : Object;
+		public abstract SceneOperation LoadScene(string runtimeKey, SceneLoadOptions options);
 		public abstract Task NextFrameAsync(CancellationToken token);
 		public abstract Task DelayAsync(TimeSpan delay, CancellationToken token);
 	}
