@@ -4,21 +4,34 @@ using DTech.AddressableManagement.Internal.Gateway;
 
 namespace DTech.AddressableManagement.Tests.Editor
 {
-	internal sealed class FakeContentOperation<TResult> : ContentOperation<TResult>
+	internal sealed class FakeContentOperation<TResult> : ContentOperation<TResult>, IFakeOperation
 	{
-		private readonly TaskCompletionSource<TResult> _completion =
-			new TaskCompletionSource<TResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+		private readonly TaskCompletionSource<TResult> _completion = new (TaskCreationOptions.RunContinuationsAsynchronously);
 
 		public override Task<TResult> Completion => _completion.Task;
 		public override float Progress => _progress;
 		public override long DownloadedBytes => _downloadedBytes;
 		public override long TotalBytes => _totalBytes;
 		public int ReleaseCalls { get; private set; }
-		
+
 		private float _progress;
 		private long _downloadedBytes;
 		private long _totalBytes;
 
+		public static FakeContentOperation<TResult> Succeeded(TResult result)
+		{
+			var operation = new FakeContentOperation<TResult>();
+			operation.Succeed(result);
+			return operation;
+		}
+
+		public static FakeContentOperation<TResult> Failed(Exception exception)
+		{
+			var operation = new FakeContentOperation<TResult>();
+			operation.Fail(exception);
+			return operation;
+		}
+		
 		public FakeContentOperation<TResult> SetProgress(float progress)
 		{
 			_progress = progress;
@@ -36,19 +49,16 @@ namespace DTech.AddressableManagement.Tests.Editor
 			_totalBytes = totalBytes;
 			return this;
 		}
-
-		public static FakeContentOperation<TResult> Succeeded(TResult result)
+		
+		public void Settle(object result)
 		{
-			var operation = new FakeContentOperation<TResult>();
-			operation.Succeed(result);
-			return operation;
-		}
+			if (result is Exception exception)
+			{
+				Fail(exception);
+				return;
+			}
 
-		public static FakeContentOperation<TResult> Failed(Exception exception)
-		{
-			var operation = new FakeContentOperation<TResult>();
-			operation.Fail(exception);
-			return operation;
+			Succeed((TResult)result);
 		}
 
 		public void Succeed(TResult result)
