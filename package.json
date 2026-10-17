@@ -1,12 +1,13 @@
 {
     "name": "com.dtech.addressablemanagement",
     "displayName": "Addressable Management",
-    "version": "0.0.2",
+    "version": "1.0.0",
     "unity": "2022.3",
     "dependencies": {
         "com.unity.addressables": "1.21.19"
     },
     "description": "Addressable Management package for Unity.",
+    "changelogUrl": "https://github.com/DanilChizhikov/AddressableManagement/releases/tag/v1.0.0",
     "keywords": [
         "Addressable Management",
         "Addressable",
