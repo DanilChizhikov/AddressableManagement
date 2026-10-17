@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using DTech.AddressableManagement.Internal.Delivery;
 using DTech.AddressableManagement.Internal.Gateway;
@@ -24,7 +25,6 @@ namespace DTech.AddressableManagement.Tests.Editor
         {
             _gateway = new FakeAddressablesGateway();
             _failures = new List<ContentFailure>();
-            LogAssert.ignoreFailingMessages = true;
         }
 
         [Test]
@@ -166,6 +166,7 @@ namespace DTech.AddressableManagement.Tests.Editor
         {
             _gateway.DownloadSize = _ => 500L;
             _gateway.DownloadOperation = _ => FakeContentOperation<bool>.Failed(new InvalidOperationException("broken"));
+            LogAssert.Expect(LogType.Error, new Regex(@"Download failed \(Unknown\).*broken"));
             using (AssetService service = Service())
             {
                 var options = new DownloadOptions(new RetryPolicy(2, TimeSpan.Zero), false);
@@ -190,6 +191,8 @@ namespace DTech.AddressableManagement.Tests.Editor
             _gateway.DownloadSize = _ => 500L;
             _gateway.DownloadOperation = _ =>
                 FakeContentOperation<bool>.Failed(new ContentDeliveryException(FailureKind.InvalidKey, "unknown key"));
+
+            LogAssert.Expect(LogType.Error, new Regex(@"Download failed \(InvalidKey\).*unknown key"));
 
             using (AssetService service = Service())
             {
@@ -248,6 +251,7 @@ namespace DTech.AddressableManagement.Tests.Editor
         {
             _gateway.DownloadSize = _ => 500L;
             _gateway.SetIsInternetReachable(false);
+            LogAssert.Expect(LogType.Error, new Regex(@"Download failed \(Network\).*not reachable"));
             using (AssetService service = Service())
             {
                 DownloadResult result = await service.DownloadAssets(new[]
