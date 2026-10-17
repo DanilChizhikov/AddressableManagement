@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using DTech.AddressableManagement.Internal.Downloads;
 using DTech.AddressableManagement.Internal.Gateway;
+using UnityEngine.ResourceManagement.ResourceLocations;
 
 namespace DTech.AddressableManagement.Tests.Editor
 {
@@ -17,12 +19,19 @@ namespace DTech.AddressableManagement.Tests.Editor
 		public Task CatalogCheckBarrier { get; set; } = Task.CompletedTask;
 		public Func<int, IReadOnlyList<string>> CatalogCheck { get; set; } = _ => Array.Empty<string>();
 		public Func<string, string> InstalledRewriter { get; private set; }
+		public Func<ContentScope, long> DownloadSize { get; set; } = _ => 0L;
+		public Func<ContentScope, ContentOperation<bool>> DownloadOperation { get; set; } =
+			_ => FakeContentOperation<bool>.Succeeded(true);
+		public IList<IResourceLocation> RemoteContent { get; set; } = new List<IResourceLocation>();
 		public List<string> ProbedUrls { get; } = new List<string>();
+		public List<ContentScope> DownloadedScopes { get; } = new List<ContentScope>();
 		public List<string> UpdatedCatalogIds { get; } = new List<string>();
 		public int InitializeCalls { get; private set; }
 		public int CatalogCheckCalls { get; private set; }
 		public int CleanBundleCacheCalls { get; private set; }
 		public int VersionResetCalls { get; private set; }
+		public int DownloadSizeCalls { get; private set; }
+		public int RemoteContentCollections { get; private set; }
 
 		private bool _isInternetReachable = true;
 		private bool _isEditor;
@@ -81,6 +90,31 @@ namespace DTech.AddressableManagement.Tests.Editor
 		{
 			CleanBundleCacheCalls++;
 			return Task.CompletedTask;
+		}
+		
+		public override Task<long> GetDownloadSizeAsync(ContentScope scope, CancellationToken token)
+		{
+			DownloadSizeCalls++;
+			try
+			{
+				return Task.FromResult(DownloadSize(scope));
+			}
+			catch (Exception exception)
+			{
+				return Task.FromException<long>(exception);
+			}
+		}
+
+		public override ContentOperation<bool> Download(ContentScope scope)
+		{
+			DownloadedScopes.Add(scope);
+			return DownloadOperation(scope);
+		}
+
+		public override IList<IResourceLocation> CollectRemoteContentLocations()
+		{
+			RemoteContentCollections++;
+			return RemoteContent;
 		}
 
 		public override async Task NextFrameAsync(CancellationToken token)

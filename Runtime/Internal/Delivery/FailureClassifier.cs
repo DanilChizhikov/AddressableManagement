@@ -62,6 +62,11 @@ namespace DTech.AddressableManagement.Internal.Delivery
 		{
 			return kind == FailureKind.Network || kind == FailureKind.ServerError || kind == FailureKind.Corrupted;
 		}
+		
+		public static bool IsTransient(FailureKind kind)
+		{
+			return MovesMirror(kind) || kind == FailureKind.Unknown;
+		}
 
 		private static FailureKind? Find(Exception exception, int depth)
 		{

@@ -1,14 +1,17 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using DTech.AddressableManagement.Internal.Diagnostics;
+using DTech.AddressableManagement.Internal.Downloads;
 using DTech.AddressableManagement.Internal.Threading;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
 using UnityEngine.AddressableAssets.ResourceLocators;
 using UnityEngine.Networking;
 using UnityEngine.ResourceManagement.AsyncOperations;
+using UnityEngine.ResourceManagement.ResourceLocations;
 
 namespace DTech.AddressableManagement.Internal.Gateway
 {
@@ -79,6 +82,40 @@ namespace DTech.AddressableManagement.Internal.Gateway
             return AwaitOwnedAsync(Addressables.CleanBundleCache(), token);
         }
 
+        public override Task<long> GetDownloadSizeAsync(ContentScope scope, CancellationToken token)
+        {
+            AsyncOperationHandle<long> handle = scope.Locations != null
+                ? Addressables.GetDownloadSizeAsync((IEnumerable)new object[] { scope.Locations })
+                : Addressables.GetDownloadSizeAsync((IEnumerable)scope.Keys);
+            return AwaitOwnedAsync(handle, token);
+        }
+
+        public override ContentOperation<bool> Download(ContentScope scope)
+        {
+            AsyncOperationHandle handle = scope.Locations != null
+                ? Addressables.DownloadDependenciesAsync(scope.Locations, false)
+                : Addressables.DownloadDependenciesAsync((IEnumerable)scope.Keys, Addressables.MergeMode.Union, false);
+            return new AddressablesOperation<bool>(handle, Succeeded);
+        }
+
+        public override IList<IResourceLocation> CollectRemoteContentLocations()
+        {
+            var seen = new HashSet<IResourceLocation>();
+            var locations = new List<IResourceLocation>();
+            foreach (IResourceLocator locator in Addressables.ResourceLocators)
+            {
+                foreach (IResourceLocation location in locator.AllLocations)
+                {
+                    if (location.HasDependencies && seen.Add(location))
+                    {
+                        locations.Add(location);
+                    }
+                }
+            }
+
+            return locations;
+        }
+
         public override async Task NextFrameAsync(CancellationToken token)
         {
             await Awaitable.NextFrameAsync(token);
@@ -87,6 +124,11 @@ namespace DTech.AddressableManagement.Internal.Gateway
         public override Task DelayAsync(TimeSpan delay, CancellationToken token)
         {
             return delay > TimeSpan.Zero ? Task.Delay(delay, token) : NextFrameAsync(token);
+        }
+        
+        private static bool Succeeded(AsyncOperationHandle handle)
+        {
+            return true;
         }
 
         private static async Task<TResult> AwaitOwnedAsync<TResult>(AsyncOperationHandle<TResult> handle,

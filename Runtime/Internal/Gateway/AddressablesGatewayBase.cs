@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using DTech.AddressableManagement.Internal.Downloads;
+using UnityEngine.ResourceManagement.ResourceLocations;
 
 namespace DTech.AddressableManagement.Internal.Gateway
 {
@@ -18,6 +20,9 @@ namespace DTech.AddressableManagement.Internal.Gateway
 		public abstract Task<IReadOnlyList<string>> CheckForCatalogUpdatesAsync(CancellationToken token);
 		public abstract Task UpdateCatalogsAsync(IReadOnlyList<string> catalogIds, CancellationToken token);
 		public abstract Task CleanBundleCacheAsync(CancellationToken token);
+		public abstract Task<long> GetDownloadSizeAsync(ContentScope scope, CancellationToken token);
+		public abstract ContentOperation<bool> Download(ContentScope scope);
+		public abstract IList<IResourceLocation> CollectRemoteContentLocations();
 		public abstract Task NextFrameAsync(CancellationToken token);
 		public abstract Task DelayAsync(TimeSpan delay, CancellationToken token);
 	}
