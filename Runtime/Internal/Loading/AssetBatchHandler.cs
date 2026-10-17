@@ -141,6 +141,7 @@ namespace DTech.AddressableManagement.Internal.Loading
             }
 
             ReleaseChildren();
+            _tracker.Untrack(this);
             IsDone = true;
             IsFailed = true;
             Exception = exception;

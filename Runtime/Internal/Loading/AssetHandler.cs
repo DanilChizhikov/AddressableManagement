@@ -110,6 +110,7 @@ namespace DTech.AddressableManagement.Internal.Loading
             AssetEntry entry = _entry;
             _entry = null;
             entry?.Release(this);
+            _tracker?.Untrack(this);
             IsDone = true;
             IsFailed = true;
             Exception = exception;
