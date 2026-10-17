@@ -7,6 +7,7 @@ using DTech.AddressableManagement.Internal.Diagnostics;
 using DTech.AddressableManagement.Internal.Downloads;
 using DTech.AddressableManagement.Internal.Gateway;
 using DTech.AddressableManagement.Internal.Loading;
+using DTech.AddressableManagement.Internal.Scenes;
 using UnityEngine;
 
 namespace DTech.AddressableManagement
@@ -33,6 +34,7 @@ namespace DTech.AddressableManagement
         private readonly DownloadCoordinator _downloads;
         private readonly HandlerTracker _handlers = new();
         private readonly AssetRegistry _assets;
+        private readonly LoadPolicy _loadPolicy;
 
         /// <summary>
         /// Whether Addressables finished initializing.
@@ -93,8 +95,8 @@ namespace DTech.AddressableManagement
             _catalogs = new CatalogUpdater(_context, _bootstrapper, settings.CleanBundleCacheAfterCatalogUpdate);
             _catalogs.OnCatalogsChanged += _downloadCache.Clear;
             _downloads = new DownloadCoordinator(_context, _bootstrapper, _catalogs, _downloadCache, _downloadSuspension);
-            var loadPolicy = new LoadPolicy(settings.LoadRetry, settings.RebindShadersInEditor);
-            _assets = new AssetRegistry(_context, _bootstrapper, _catalogs, loadPolicy);
+            _loadPolicy = new LoadPolicy(settings.LoadRetry, settings.RebindShadersInEditor);
+            _assets = new AssetRegistry(_context, _bootstrapper, _catalogs, _loadPolicy);
         }
 
         /// <summary>
@@ -267,14 +269,38 @@ namespace DTech.AddressableManagement
         }
 
         /// <summary>
-        /// Loads an addressable scene.
+        /// Loads an addressable scene. A key that points at nothing gives a failed handler.
         /// </summary>
         /// <param name="key">The scene key.</param>
         /// <param name="options">Load mode, deferred activation and priority.</param>
         /// <param name="lifetime">Unloads the scene when cancelled.</param>
         /// <returns>The handler of the scene.</returns>
-        public ISceneHandler LoadScene(SceneKey key, SceneLoadOptions options, CancellationToken lifetime = default) =>
-            throw new NotImplementedException();
+        public ISceneHandler LoadScene(SceneKey key, SceneLoadOptions options, CancellationToken lifetime = default)
+        {
+            ThrowIfDisposed();
+            if (key == null)
+            {
+                throw new ArgumentNullException(nameof(key));
+            }
+
+            var handler = new SceneHandler(key, options, _context, _handlers, _loadPolicy);
+            handler.AttachCancellationToken(lifetime);
+            if (handler.IsReleased)
+            {
+                return handler;
+            }
+
+            if (!key.IsValid)
+            {
+                var error = new ContentDeliveryException(FailureKind.InvalidKey, "The key does not point at any scene.");
+                RaiseFailed(new ContentFailure(ContentStage.Scene, FailureKind.InvalidKey, key.RuntimeKey, error));
+                handler.Fail(FailureKind.InvalidKey, error);
+                return handler;
+            }
+
+            handler.Start(_bootstrapper, _catalogs);
+            return handler;
+        }
 
         /// <summary>
         /// Releases every handler loaded with the key, whatever its type, and unloads the content.
