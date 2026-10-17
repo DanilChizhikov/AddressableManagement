@@ -1,6 +1,7 @@
-using UnityEngine;
+using System;
 using UnityEngine.AddressableAssets;
 using UnityEngine.ResourceManagement.AsyncOperations;
+using Object = UnityEngine.Object;
 
 namespace DTech.AddressableManagement
 {
@@ -8,8 +9,7 @@ namespace DTech.AddressableManagement
     {
         public static AssetHandler<TResult> LoadAssetAsync<TResult>(string key) where TResult : Object
         {
-            AsyncOperationHandle<TResult> handle = Addressables.LoadAssetAsync<TResult>(key);
-            return new AssetHandler<TResult>(key, handle);
+            throw new NotImplementedException();
         }
     }
 }
