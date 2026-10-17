@@ -9,13 +9,17 @@ namespace DTech.AddressableManagement.Internal.Delivery
 	{
 		private readonly Action<ContentFailure> _report;
 
-		public AddressablesGateway Gateway { get; }
+		public AddressablesGatewayBase Gateway { get; }
 		public ContentRoute Route { get; }
 		public AssetLog Log { get; }
 		public CancellationToken Lifetime { get; }
 
-		public ContentContext(AddressablesGateway gateway, ContentRoute route, AssetLog log,
-			Action<ContentFailure> report, CancellationToken lifetime)
+		public ContentContext(
+			AddressablesGatewayBase gateway,
+			ContentRoute route,
+			AssetLog log,
+			Action<ContentFailure> report,
+			CancellationToken lifetime)
 		{
 			Gateway = gateway;
 			Route = route;

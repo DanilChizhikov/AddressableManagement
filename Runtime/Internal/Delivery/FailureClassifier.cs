@@ -10,18 +10,8 @@ namespace DTech.AddressableManagement.Internal.Delivery
 		private const int MaxDepth = 16;
 
 		public static FailureKind Classify(Exception exception) => Find(exception, 0) ?? FailureKind.Unknown;
-
-		public static bool MovesRoot(FailureKind kind)
-		{
-			return kind == FailureKind.NotFound;
-		}
-
-		public static bool MovesMirror(FailureKind kind)
-		{
-			return kind == FailureKind.Network || kind == FailureKind.ServerError || kind == FailureKind.Corrupted;
-		}
 		
-		private static FailureKind Classify(long responseCode, UnityWebRequest.Result result)
+		public static FailureKind Classify(long responseCode, UnityWebRequest.Result result)
 		{
 			if (responseCode == 404 ||
 				responseCode == 410)
@@ -61,6 +51,16 @@ namespace DTech.AddressableManagement.Internal.Delivery
 				default:
 					return FailureKind.Unknown;
 			}
+		}
+
+		public static bool MovesRoot(FailureKind kind)
+		{
+			return kind == FailureKind.NotFound;
+		}
+
+		public static bool MovesMirror(FailureKind kind)
+		{
+			return kind == FailureKind.Network || kind == FailureKind.ServerError || kind == FailureKind.Corrupted;
 		}
 
 		private static FailureKind? Find(Exception exception, int depth)

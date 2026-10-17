@@ -62,7 +62,11 @@ namespace DTech.AddressableManagement
         /// Creates the service.
         /// </summary>
         /// <param name="settings">How the service behaves; read once.</param>
-        public AssetService(AssetServiceSettings settings)
+        public AssetService(AssetServiceSettings settings) : this(settings, null)
+        {
+        }
+
+        internal AssetService(AssetServiceSettings settings, AddressablesGatewayBase gateway)
         {
             if (settings == null)
             {
@@ -75,7 +79,8 @@ namespace DTech.AddressableManagement
             };
 
             _route = new ContentRoute(settings.Delivery, _log);
-            _context = new ContentContext(new AddressablesGateway(_log), _route, _log,
+            gateway ??= new AddressablesGateway(_log);
+            _context = new ContentContext(gateway, _route, _log,
                 RaiseFailed,
                 _lifetime.Token);
 
