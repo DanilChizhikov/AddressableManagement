@@ -6,7 +6,7 @@ namespace DTech.AddressableManagement.Internal.Delivery
 {
 	internal static class RouteTemplates
 	{
-		private const string PlatformToken = "{Platform}";
+		public const string PlatformToken = "{Platform}";
 
 		public static string Evaluate(string template)
 		{
